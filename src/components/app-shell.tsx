@@ -23,7 +23,7 @@ import { SyncSettings } from "@/components/sync-settings";
 import { canManageTeam, ROLE_LABELS, useAuth, type Session } from "@/hooks/use-auth";
 import { canUseSalonTools, departmentLabel, useDepartments } from "@/hooks/use-departments";
 import type { Department } from "@/models/types";
-import { accountEmail } from "@/supabase";
+import { accountEmail, isSupabaseConfigured } from "@/supabase";
 import { initial } from "@/utils/format";
 import { COMPANY_NAME, SALON_NAME } from "@/brand";
 
@@ -124,26 +124,52 @@ export function RootLayout({ children }: { children: ReactNode }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
 
+  // The app shell (sidebar, header, page content) is only mounted for an
+  // approved, signed-in user — otherwise the dashboard would render behind the
+  // sign-in overlay.
+  const signedIn = ready && session !== null && session.approved;
+  const awaitingApproval = ready && session !== null && !session.approved;
+
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[250px_1fr]">
-      <Sidebar pathname={pathname} onOpenAccount={() => setShowAccount(true)} />
+    <div
+      className={
+        signedIn ? "min-h-screen md:grid md:grid-cols-[250px_1fr]" : "min-h-screen"
+      }
+    >
+      {signedIn && (
+        <>
+          <Sidebar
+            pathname={pathname}
+            onOpenAccount={() => setShowAccount(true)}
+          />
 
-      <main className="min-w-0">
-        <Topbar
-          onOpenSettings={() => setShowSettings(true)}
-          onOpenAccount={() => setShowAccount(true)}
-        />
-        <SyncBanner />
-        <div className="mx-auto max-w-[1500px] p-4 pb-28 md:p-6 md:pb-10">
-          {children}
+          <main className="min-w-0">
+            <Topbar
+              onOpenSettings={() => setShowSettings(true)}
+              onOpenAccount={() => setShowAccount(true)}
+            />
+            <SyncBanner />
+            <div className="mx-auto max-w-[1500px] p-4 pb-28 md:p-6 md:pb-10">
+              {children}
+            </div>
+          </main>
+
+          <MobileNav pathname={pathname} />
+          <SyncSettings
+            open={showSettings}
+            onClose={() => setShowSettings(false)}
+          />
+          {showAccount && <AccountModal onClose={() => setShowAccount(false)} />}
+        </>
+      )}
+
+      {!ready && (
+        <div className="grid min-h-screen place-items-center">
+          <div className="size-6 animate-pulse rounded-full bg-slate-200" />
         </div>
-      </main>
-
-      <MobileNav pathname={pathname} />
-      <SyncSettings open={showSettings} onClose={() => setShowSettings(false)} />
-      {showAccount && <AccountModal onClose={() => setShowAccount(false)} />}
+      )}
       {ready && !session && <AuthGate />}
-      {ready && session && !session.approved && <PendingApproval />}
+      {awaitingApproval && <PendingApproval />}
     </div>
   );
 }
@@ -378,6 +404,13 @@ function AuthGate() {
             ? "Set up your barber account with a mobile number and 6-digit PIN."
             : "Sign in with your mobile number (or email) and PIN."}
         </p>
+
+        {!isSupabaseConfigured && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Local-only mode — no backend is configured, so sign-in is by mobile
+            number and PIN on this device. Email sign-in needs Supabase.
+          </p>
+        )}
 
         <div className="mt-5 space-y-3">
           {creating && (

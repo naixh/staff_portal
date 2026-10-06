@@ -184,13 +184,37 @@ to them.
 
 ### 4. Configure the client
 
+The browser build needs the Supabase **URL** and the **publishable key**. Any of
+these names work — set whichever you prefer:
+
 ```
+# Either the Vite/Next style…
 VITE_SUPABASE_URL=https://<ref>.supabase.co
 VITE_SUPABASE_ANON_KEY=<publishable key>
+
+# …or the plain names your server tooling already uses
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<publishable key>
+
 VITE_AUTH_PHONE_PREFIX=+960   # optional country code
 ```
 
 The publishable/anon key is safe in the browser — RLS protects the data.
+
+> **How it works:** Vite only exposes `VITE_*` / `NEXT_PUBLIC_*` variables to the
+> browser. `vite.config.ts` additionally reads the plain `SUPABASE_URL` /
+> `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`) names and injects **only
+> those two** values via `define`.
+>
+> **Never** prefix the secret key (`SUPABASE_SECRET_KEY`) with `VITE_`/
+> `NEXT_PUBLIC_` — that would ship it to the browser.
+>
+> A build missing the URL/key silently falls back to **local-only mode** (mobile
+> + PIN on that device, no email sign-in); the login screen shows a "Local-only
+> mode" notice.
+
+After changing env vars, restart `npm run dev` (Vite reads `.env` at startup) or
+rebuild.
 
 ### 5. Deploy to Vercel
 

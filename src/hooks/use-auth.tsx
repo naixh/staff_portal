@@ -291,7 +291,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: true };
       }
 
-      // Offline local fallback (mobile numbers only).
+      // Offline local fallback (mobile numbers only — emails need Supabase).
+      if (asEmail) {
+        return {
+          ok: false,
+          error:
+            "Email sign-in needs the Supabase backend — this build has no backend configured.",
+        };
+      }
       const digits = normalizeMobile(identifier);
       const barber = await getBarberByPhone(digits);
       if (!barber) {
@@ -363,7 +370,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: true };
       }
 
-      // Offline local fallback.
+      // Offline local fallback (mobile numbers only — emails need Supabase).
+      if (asEmail) {
+        return {
+          ok: false,
+          error:
+            "Email accounts need the Supabase backend — this build has no backend configured.",
+        };
+      }
       const existing = await getBarberByPhone(digits);
       if (existing) {
         return { ok: false, error: "That mobile number is already registered" };

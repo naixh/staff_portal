@@ -1,15 +1,33 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// Vite only exposes `VITE_*` by default; `vite.config.ts` also enables
-// `NEXT_PUBLIC_*` so the same names work whether you're used to Next or Vite.
+// Injected at build time from `.env` by `vite.config.ts` — lets the plain
+// `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` names work as well as `VITE_*`.
+declare const __SUPABASE_URL__: string;
+declare const __SUPABASE_ANON_KEY__: string;
+
+// Vite only exposes `VITE_*` (and `NEXT_PUBLIC_*`) by default.
 const env = import.meta.env as Record<string, string | undefined>;
 
-const url = env.VITE_SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
-const key =
-  env.VITE_SUPABASE_ANON_KEY ??
-  env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+/** First non-empty value, so a blank var doesn't shadow a later fallback. */
+function firstNonEmpty(...values: (string | undefined)[]): string | undefined {
+  for (const value of values) {
+    if (value && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+const url = firstNonEmpty(
+  env.VITE_SUPABASE_URL,
+  env.NEXT_PUBLIC_SUPABASE_URL,
+  __SUPABASE_URL__,
+);
+const key = firstNonEmpty(
+  env.VITE_SUPABASE_ANON_KEY,
+  env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  __SUPABASE_ANON_KEY__,
+);
 
 /** True when the Supabase URL + public key are present at build time. */
 export const isSupabaseConfigured = Boolean(url && key);
