@@ -282,7 +282,7 @@ function Topbar({
         <button
           type="button"
           onClick={onOpenSettings}
-          aria-label="Offline and sync settings"
+          aria-label="Settings"
           className="grid size-9 place-items-center rounded-lg border bg-white hover:bg-slate-50"
         >
           <Settings className="size-4" />

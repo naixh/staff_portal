@@ -5,19 +5,22 @@ import {
   BadgeDollarSign,
   CircleDollarSign,
   Clock3,
+  Coffee,
   Hourglass,
   Receipt,
   Scissors,
-  ShoppingBag,
+  Thermometer,
   Users,
 } from "lucide-react";
 import { Money } from "@/components/money";
+import { ClockCard } from "@/components/clock-card";
 import { COMPANY_NAME } from "@/brand";
 import { StaffHome } from "@/components/staff-home";
 import { useSales } from "@/hooks/use-sales";
 import { useBarbers } from "@/hooks/use-barbers";
 import { canUseSalonTools, useDepartments } from "@/hooks/use-departments";
 import { canManageTeam, useAuth } from "@/hooks/use-auth";
+import { useMyClock } from "@/hooks/use-my-clock";
 import { todayKey, useAttendance } from "@/hooks/use-attendance";
 import type { Attendance, Sale } from "@/models/types";
 import { formatTime, initial, minutesBetween } from "@/utils/format";
@@ -51,10 +54,12 @@ export function DashboardRoute() {
 
 function SalonDashboard() {
   const { session } = useAuth();
+  const isAdmin = canManageTeam(session?.role);
   const { data: sales = [] } = useSales();
   const { data: barbers = [] } = useBarbers();
   const methods = usePaymentMethods();
   const { data: attendance = [] } = useAttendance();
+  const myClock = useMyClock();
   const today = todayKey();
   const todayAttendance = new Map<string, Attendance>(
     attendance
@@ -62,9 +67,15 @@ function SalonDashboard() {
       .map((record) => [record.barberId, record] as const),
   );
 
+  // Admins see the whole salon; floor staff only see the sales they took.
   const todaySales = useMemo(
-    () => sales.filter((s) => isToday(parseISO(s.soldAt))),
-    [sales],
+    () =>
+      sales.filter(
+        (s) =>
+          isToday(parseISO(s.soldAt)) &&
+          (isAdmin || s.barberId === session?.barberId),
+      ),
+    [sales, isAdmin, session?.barberId],
   );
 
   const todaysTotal = todaySales
@@ -98,57 +109,91 @@ function SalonDashboard() {
   );
   const awayCount = onLeave.length + onSick.length;
   const notCheckedIn = Math.max(0, barbers.length - barbersIn - awayCount);
-  const isAdmin = canManageTeam(session?.role);
 
   const recent = todaySales.slice(0, 4);
 
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border bg-gradient-to-br from-white to-amber-50 p-5 shadow-card">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-slate-500">{greeting(new Date().getHours())}</p>
-            <h2 className="mt-1 text-2xl font-bold">
-              {isAdmin
-                ? COMPANY_NAME
-                : `Welcome back, ${session?.name ?? "there"} 👋`}
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {isAdmin
-                ? "Here is today's overview — sales, attendance and leave."
-                : "Here is today's salon performance."}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {!isAdmin && (
-              <Link
-                to="/sales/new"
-                className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white"
+        <p className="text-sm text-slate-500">
+          {greeting(new Date().getHours())}
+        </p>
+        <h2 className="mt-1 text-2xl font-bold">
+          {isAdmin
+            ? COMPANY_NAME
+            : `Welcome back, ${session?.name ?? "there"} 👋`}
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          {isAdmin
+            ? "Here is today's overview — sales, attendance and leave."
+            : "Here is today's salon performance."}
+        </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {!isAdmin && (
+            <>
+              <button
+                type="button"
+                onClick={() => myClock.act(myClock.checkedIn ? "out" : "in")}
+                disabled={!myClock.session || myClock.pending}
+                className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
               >
-                <ShoppingBag className="size-4" /> New Sale
-              </Link>
-            )}
+                <Clock3 className="size-4" /> {myClock.primaryLabel}
+              </button>
+              {myClock.checkedIn && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    myClock.act(myClock.onBreak ? "break-end" : "break-start")
+                  }
+                  disabled={myClock.pending}
+                  className="flex items-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-40"
+                >
+                  <Coffee className="size-4" />
+                  {myClock.onBreak ? "End Break" : "Start Break"}
+                </button>
+              )}
+              {!myClock.checkedIn && !myClock.finished && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    myClock.markLeave(myClock.leaveStatus === "sick" ? null : "sick")
+                  }
+                  disabled={myClock.pending}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium disabled:opacity-40 ${
+                    myClock.leaveStatus === "sick"
+                      ? "border-amber-300 bg-amber-50 text-amber-800"
+                      : "bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <Thermometer className="size-4" />
+                  {myClock.leaveStatus === "sick" ? "Sick today" : "Mark sick"}
+                </button>
+              )}
+            </>
+          )}
+          {isAdmin && (
             <Link
               to="/attendance"
               className="flex items-center gap-2 rounded-lg border bg-white px-4 py-2.5 text-sm font-medium"
             >
-              <Clock3 className="size-4" /> {isAdmin ? "Attendance" : "Barber Time"}
+              <Clock3 className="size-4" /> Attendance
             </Link>
-            {isAdmin && (
-              <Link
-                to="/admin"
-                className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white"
-              >
-                <Users className="size-4" /> Team
-              </Link>
-            )}
-          </div>
+          )}
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white"
+            >
+              <Users className="size-4" /> Team
+            </Link>
+          )}
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
-          label="Today's Sales"
+          label={isAdmin ? "Today's Sales" : "My sales"}
           value={
             <>
               <Money value={todaysTotal} />
@@ -205,12 +250,18 @@ function SalonDashboard() {
         />
       </div>
 
+      {!isAdmin && <ClockCard showHistory />}
+
       <div className="grid gap-4 xl:grid-cols-[1.3fr_.7fr]">
         <div className="rounded-xl border bg-white shadow-card">
           <div className="flex items-center justify-between border-b p-4">
             <div>
-              <h3 className="font-semibold">Recent sales</h3>
-              <p className="text-xs text-slate-500">Latest transactions today</p>
+              <h3 className="font-semibold">
+                {isAdmin ? "Recent sales" : "My recent sales"}
+              </h3>
+              <p className="text-xs text-slate-500">
+                {isAdmin ? "Latest transactions today" : "Your latest sales today"}
+              </p>
             </div>
             <Link to="/sales" className="text-sm font-medium">
               View all
@@ -218,7 +269,9 @@ function SalonDashboard() {
           </div>
           {recent.length === 0 ? (
             <p className="p-8 text-center text-sm text-slate-500">
-              No sales recorded today yet.
+              {isAdmin
+                ? "No sales recorded today yet."
+                : "You haven't recorded any sales today."}
             </p>
           ) : (
             <div className="divide-y">

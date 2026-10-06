@@ -4,7 +4,6 @@ import { Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { addToast } from "@heroui/react";
 import { useAuth } from "@/hooks/use-auth";
 import { useServices } from "@/hooks/use-services";
-import { useBarbers } from "@/hooks/use-barbers";
 import { useCreateSale } from "@/hooks/use-sales";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { CURRENCIES, type Currency, type PaymentMethod, type SaleItem } from "@/models/types";
@@ -15,16 +14,19 @@ export function NewSaleRoute() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const { data: services = [], isLoading: servicesLoading } = useServices();
-  const { data: barbers = [] } = useBarbers();
   const createSale = useCreateSale();
   const methods = usePaymentMethods();
 
-  const [barberId, setBarberId] = useState(session?.barberId ?? "");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("");
   const [currency, setCurrency] = useState<Currency>("MVR");
   const [tips, setTips] = useState(0);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // A sale is always recorded against the signed-in barber — staff can't enter
+  // sales on someone else's behalf.
+  const barberId = session?.barberId ?? "";
+  const barberName = session?.name ?? "";
 
   const items = useMemo<SaleItem[]>(
     () =>
@@ -48,18 +50,6 @@ export function NewSaleRoute() {
 
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const total = subtotal + tips;
-  const selectedBarber = barbers.find((b) => b.id === barberId);
-
-  // Auto-select the signed-in barber once the roster is available.
-  useEffect(() => {
-    if (!session) return;
-    setBarberId((current) => {
-      if (current) return current;
-      return barbers.some((b) => b.id === session.barberId)
-        ? session.barberId
-        : current;
-    });
-  }, [session, barbers]);
 
   // Default to the first configured payment method.
   useEffect(() => {
@@ -80,7 +70,7 @@ export function NewSaleRoute() {
 
   function openPayment() {
     if (!barberId) {
-      addToast({ title: "Select a barber", color: "warning" });
+      addToast({ title: "You need to be signed in", color: "warning" });
       return;
     }
     if (items.length === 0) {
@@ -91,8 +81,8 @@ export function NewSaleRoute() {
   }
 
   async function handleComplete() {
-    if (!selectedBarber) {
-      addToast({ title: "Select a barber", color: "warning" });
+    if (!barberId) {
+      addToast({ title: "You need to be signed in", color: "warning" });
       return;
     }
     await createSale.mutateAsync({
@@ -100,7 +90,7 @@ export function NewSaleRoute() {
       total,
       tips,
       barberId,
-      barberName: selectedBarber.name,
+      barberName,
       paymentMethod,
       currency,
       soldAt: new Date().toISOString(),
@@ -113,23 +103,6 @@ export function NewSaleRoute() {
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
       <div className="space-y-5">
-        <div className="rounded-xl border bg-white p-4 shadow-card">
-          <label className="text-sm font-medium">Barber</label>
-          <select
-            value={barberId}
-            onChange={(e) => setBarberId(e.target.value)}
-            className="mt-2 h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-900"
-          >
-            <option value="">Select barber</option>
-            {barbers.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-                {b.id === session?.barberId ? " (you)" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="rounded-xl border bg-white shadow-card">
           <div className="flex items-center justify-between gap-2 border-b p-4">
             <div>
@@ -180,30 +153,30 @@ export function NewSaleRoute() {
                     type="button"
                     disabled={noUsd}
                     onClick={() => addService(svc.id)}
-                    className={`group rounded-xl border bg-white p-4 text-left transition hover:border-slate-400 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 ${
+                    className={`group flex items-center gap-3 rounded-xl border bg-white p-3 text-left transition hover:border-slate-400 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 ${
                       qty > 0 ? "border-slate-900" : ""
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="grid size-9 place-items-center rounded-lg bg-slate-100">
-                        <Icon className="size-4" />
+                    <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100">
+                      <Icon className="size-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">
+                        {svc.name}
                       </div>
-                      {qty > 0 ? (
-                        <span className="rounded-full bg-slate-950 px-2 py-0.5 text-xs font-semibold text-white">
-                          ×{qty}
-                        </span>
-                      ) : (
-                        <Plus className="size-4 text-slate-400 group-hover:text-slate-900" />
+                      {noUsd && (
+                        <div className="text-xs text-amber-600">No USD price</div>
                       )}
                     </div>
-                    <div className="mt-4 text-sm font-semibold">{svc.name}</div>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="shrink-0 text-sm text-slate-500">
                       <Money value={unitPrice} currency={currency} />
                     </div>
-                    {noUsd && (
-                      <div className="mt-1 text-xs text-amber-600">
-                        No USD price
-                      </div>
+                    {qty > 0 ? (
+                      <span className="shrink-0 rounded-full bg-slate-950 px-2 py-0.5 text-xs font-semibold text-white">
+                        ×{qty}
+                      </span>
+                    ) : (
+                      <Plus className="size-4 shrink-0 text-slate-400 group-hover:text-slate-900" />
                     )}
                   </button>
                 );

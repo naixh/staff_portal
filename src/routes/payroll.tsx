@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { addToast } from "@heroui/react";
-import { PenLine, Plus, Trash2, Wallet } from "lucide-react";
-import { Money } from "@/components/money";
+import { Eye, EyeOff, PenLine, Plus, Trash2, Wallet } from "lucide-react";
+import { Money, RufiyaaSign } from "@/components/money";
 import { SignaturePad } from "@/components/signature-pad";
 import { canManageTeam, useAuth } from "@/hooks/use-auth";
 import { useProfiles } from "@/hooks/use-profiles";
+import { useVerifyPin } from "@/hooks/use-verify-pin";
 import {
   useCreatePayroll,
   useDeletePayroll,
   usePayrollPayments,
   useSignPayroll,
 } from "@/hooks/use-payroll";
-import type { PayrollPayment } from "@/models/types";
+import type { Currency, PayrollPayment } from "@/models/types";
 import { initial } from "@/utils/format";
 
 /** Current payroll period as YYYY-MM. */
@@ -40,14 +41,58 @@ function signedAtLabel(value: string | null): string {
 
 export function PayrollRoute() {
   const { session } = useAuth();
-  return canManageTeam(session?.role) ? <PayrollAdmin /> : <MySalary />;
+  const admin = canManageTeam(session?.role);
+  // Salary figures stay masked until the PIN is re-entered.
+  const [revealed, setRevealed] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">
+            {admin ? "Payroll" : "My salary"}
+          </h2>
+          <p className="text-sm text-slate-500">
+            {admin
+              ? "Run salary for a staff member, sign it off, and they sign back to acknowledge receipt."
+              : "Your salary runs appear here — sign to acknowledge each payment you receive."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => (revealed ? setRevealed(false) : setPromptOpen(true))}
+          className="flex shrink-0 items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
+        >
+          {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          {revealed ? "Hide amounts" : "Show amounts"}
+        </button>
+      </div>
+
+      {admin ? (
+        <PayrollAdmin revealed={revealed} />
+      ) : (
+        <MySalary revealed={revealed} />
+      )}
+
+      {promptOpen && (
+        <UnlockModal
+          onClose={() => setPromptOpen(false)}
+          onUnlocked={() => {
+            setRevealed(true);
+            setPromptOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────────
 // Admin: run salary and sign off
 // ──────────────────────────────────────────────────────────────────────
 
-function PayrollAdmin() {
+function PayrollAdmin({ revealed }: { revealed: boolean }) {
   const { data: profiles = [] } = useProfiles();
   const { data: payments = [], isLoading } = usePayrollPayments();
   const create = useCreatePayroll();
@@ -125,14 +170,6 @@ function PayrollAdmin() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold">Payroll</h2>
-        <p className="text-sm text-slate-500">
-          Run salary for a staff member, sign it off, and they sign back to
-          acknowledge receipt.
-        </p>
-      </div>
-
       <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
         <div className="overflow-hidden rounded-xl border bg-white shadow-card">
           <div className="border-b bg-slate-50 px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -165,7 +202,11 @@ function PayrollAdmin() {
                     </div>
                   </div>
                   <StatusBadge payment={payment} />
-                  <Money value={payment.total} className="text-sm font-semibold" />
+                  <MaskedMoney
+                    value={payment.total}
+                    revealed={revealed}
+                    className="text-sm font-semibold"
+                  />
                   <SignatureChip label="Admin" src={payment.adminSignature} />
                   <SignatureChip label="Staff" src={payment.staffSignature} />
                   <button
@@ -295,7 +336,7 @@ function AmountField({
 // Staff: my payslips and sign-off
 // ──────────────────────────────────────────────────────────────────────
 
-function MySalary() {
+function MySalary({ revealed }: { revealed: boolean }) {
   const { session } = useAuth();
   const { data: profiles = [] } = useProfiles();
   const { data: payments = [], isLoading } = usePayrollPayments();
@@ -307,19 +348,11 @@ function MySalary() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold">My salary</h2>
-        <p className="text-sm text-slate-500">
-          Your salary runs appear here — sign to acknowledge each payment you
-          receive.
-        </p>
-      </div>
-
       {me && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <SummaryCard label="Monthly salary" value={me.salary} />
-          <SummaryCard label="Food allowance" value={me.food} />
-          <SummaryCard label="Bonus" value={me.bonus} />
+          <SummaryCard label="Monthly salary" value={me.salary} revealed={revealed} />
+          <SummaryCard label="Food allowance" value={me.food} revealed={revealed} />
+          <SummaryCard label="Bonus" value={me.bonus} revealed={revealed} />
         </div>
       )}
 
@@ -355,10 +388,14 @@ function MySalary() {
                   <div className="text-sm font-medium">
                     {periodLabel(payment.period)}
                   </div>
-                  <Breakdown payment={payment} />
+                  <Breakdown payment={payment} revealed={revealed} />
                 </div>
                 <StatusBadge payment={payment} />
-                <Money value={payment.total} className="text-sm font-semibold" />
+                <MaskedMoney
+                  value={payment.total}
+                  revealed={revealed}
+                  className="text-sm font-semibold"
+                />
                 {payment.status === "signed" ? (
                   <SignatureChip label="You" src={payment.staffSignature} />
                 ) : (
@@ -379,6 +416,7 @@ function MySalary() {
       {signing && (
         <SignModal
           payment={signing}
+          revealed={revealed}
           pending={sign.isPending}
           onClose={() => setSigning(null)}
           onSubmit={async (signature) => {
@@ -401,11 +439,13 @@ function MySalary() {
 
 function SignModal({
   payment,
+  revealed,
   pending,
   onClose,
   onSubmit,
 }: {
   payment: PayrollPayment;
+  revealed: boolean;
   pending: boolean;
   onClose: () => void;
   onSubmit: (signature: string) => void;
@@ -417,8 +457,12 @@ function SignModal({
         <h3 className="font-semibold">Acknowledge payment</h3>
         <p className="mt-1 text-sm text-slate-500">
           {periodLabel(payment.period)} · receiving{" "}
-          <Money value={payment.total} className="font-medium" />. Sign below to
-          confirm.
+          <MaskedMoney
+            value={payment.total}
+            revealed={revealed}
+            className="font-medium"
+          />
+          . Sign below to confirm.
         </p>
         <div className="mt-4">
           <SignaturePad onChange={setSignature} />
@@ -449,12 +493,20 @@ function SignModal({
 // Shared bits
 // ──────────────────────────────────────────────────────────────────────
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({
+  label,
+  value,
+  revealed,
+}: {
+  label: string;
+  value: number;
+  revealed: boolean;
+}) {
   return (
     <div className="rounded-xl border bg-white p-4 shadow-card">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-xl font-bold">
-        <Money value={value} />
+        <MaskedMoney value={value} revealed={revealed} />
       </div>
     </div>
   );
@@ -478,7 +530,16 @@ function StatusBadge({ payment }: { payment: PayrollPayment }) {
   );
 }
 
-function Breakdown({ payment }: { payment: PayrollPayment }) {
+function Breakdown({
+  payment,
+  revealed,
+}: {
+  payment: PayrollPayment;
+  revealed: boolean;
+}) {
+  if (!revealed) {
+    return <div className="text-xs text-slate-400">Salary · Food · Bonus</div>;
+  }
   const parts = [
     `Salary ${payment.salary}`,
     payment.food ? `Food ${payment.food}` : null,
@@ -486,6 +547,110 @@ function Breakdown({ payment }: { payment: PayrollPayment }) {
     payment.deductions ? `− ${payment.deductions}` : null,
   ].filter(Boolean);
   return <div className="text-xs text-slate-500">{parts.join(" · ")}</div>;
+}
+
+/** Money that stays masked until the PIN is re-entered. */
+function MaskedMoney({
+  value,
+  revealed,
+  currency = "MVR",
+  className,
+}: {
+  value: number;
+  revealed: boolean;
+  currency?: Currency;
+  className?: string;
+}) {
+  if (revealed) {
+    return <Money value={value} currency={currency} className={className} />;
+  }
+  return (
+    <span
+      className={`inline-flex items-center gap-[0.15em] text-slate-400 ${
+        className ?? ""
+      }`}
+    >
+      {currency === "USD" ? (
+        <span className="shrink-0">$</span>
+      ) : (
+        <RufiyaaSign className="h-[0.85em] w-[0.835em] shrink-0" />
+      )}
+      <span className="tracking-[0.2em]">••••</span>
+      <span className="sr-only">hidden — enter your PIN to show</span>
+    </span>
+  );
+}
+
+/** PIN prompt used to unmask salary figures. */
+function UnlockModal({
+  onClose,
+  onUnlocked,
+}: {
+  onClose: () => void;
+  onUnlocked: () => void;
+}) {
+  const { session } = useAuth();
+  const verify = useVerifyPin(session);
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    setError("");
+    setBusy(true);
+    try {
+      const ok = await verify(pin);
+      if (ok) onUnlocked();
+      else setError("Incorrect PIN");
+    } catch {
+      setError("Could not verify the PIN");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+        <h3 className="font-semibold">Enter your PIN</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Confirm your PIN to reveal salary amounts.
+        </p>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          autoFocus
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void submit();
+          }}
+          placeholder="••••"
+          className="mt-4 h-10 w-full rounded-lg border px-3 text-sm tracking-[0.3em] outline-none focus:ring-2 focus:ring-slate-900"
+        />
+        {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={pin.length !== 6 || busy}
+            className="rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+          >
+            {busy ? "Checking…" : "Unlock"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SignatureChip({ label, src }: { label: string; src: string | null }) {

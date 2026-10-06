@@ -42,12 +42,19 @@ export function SalesRoute() {
   const isAdmin = canManageTeam(session?.role);
   const canEdit = canUseSalonTools(session, departments) && !isAdmin;
 
+  // Staff only see the sales they took; admins see the whole salon.
+  const visibleSales = useMemo(
+    () =>
+      isAdmin ? sales : sales.filter((s) => s.barberId === session?.barberId),
+    [sales, isAdmin, session?.barberId],
+  );
+
   const filtered = useMemo(
     () =>
       filter === "all"
-        ? sales
-        : sales.filter((s) => s.paymentMethod === filter),
-    [sales, filter],
+        ? visibleSales
+        : visibleSales.filter((s) => s.paymentMethod === filter),
+    [visibleSales, filter],
   );
 
   async function handleDelete(id: string) {
@@ -61,7 +68,9 @@ export function SalesRoute() {
         <div>
           <h2 className="text-xl font-semibold">Sales</h2>
           <p className="text-sm text-slate-500">
-            Track cash, transfers, tips and receipts.
+            {isAdmin
+              ? "Track cash, transfers, tips and receipts."
+              : "Your sales, tips and receipts."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

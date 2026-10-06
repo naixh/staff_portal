@@ -1,17 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Settings2, ShieldCheck, Trash2, Upload, X } from "lucide-react";
+import { Check, Settings2, ShieldCheck, Upload, X } from "lucide-react";
 import { addToast } from "@heroui/react";
-import { usePaymentMethods, useUpdatePaymentMethods } from "@/hooks/use-payment-methods";
 import { Money } from "@/components/money";
 import { profilesKey, useProfiles, type Profile } from "@/hooks/use-profiles";
 import {
   departmentHasSalonTools,
   departmentLabel,
   useDepartments,
-  useUpdateDepartments,
 } from "@/hooks/use-departments";
-import type { Department, PaymentMethodOption, StaffType } from "@/models/types";
+import type { StaffType } from "@/models/types";
 import { getSupabase } from "@/supabase";
 import { initial } from "@/utils/format";
 import { fileToCompressedDataUrl } from "@/utils/image";
@@ -134,8 +132,6 @@ export function AdminRoute() {
             onRole={(id, role) => updateProfile.mutate({ id, patch: { role } })}
             onSave={(id, patch) => updateProfile.mutate({ id, patch })}
           />
-          <PaymentMethodsCard />
-          <DepartmentsCard />
         </>
       )}
     </div>
@@ -174,75 +170,82 @@ function ProfileCard({
       ) : (
         <div className="divide-y">
           {profiles.map((profile) => (
-            <div key={profile.id} className="flex flex-wrap items-center gap-3 p-4">
-              <div className="grid size-9 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                {initial(profile.name || profile.phone || "?")}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">
-                    {profile.name || "(no name)"}
-                  </span>
-                  <span
-                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${ROLE_STYLES[profile.role]}`}
-                  >
-                    {profile.role === "owner" && <ShieldCheck className="size-3" />}
-                    {profile.role}
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${departmentBadgeClass(
-                      departmentHasSalonTools(departments, profile.department),
-                    )}`}
-                  >
-                    {departmentLabel(departments, profile.department)}
-                  </span>
+            <div
+              key={profile.id}
+              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                  {initial(profile.name || profile.phone || "?")}
                 </div>
-                <div className="text-xs text-slate-500">
-                  {profile.phone || profile.id}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="min-w-0 truncate text-sm font-medium">
+                      {profile.name || "(no name)"}
+                    </span>
+                    <span
+                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${ROLE_STYLES[profile.role]}`}
+                    >
+                      {profile.role === "owner" && <ShieldCheck className="size-3" />}
+                      {profile.role}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${departmentBadgeClass(
+                        departmentHasSalonTools(departments, profile.department),
+                      )}`}
+                    >
+                      {departmentLabel(departments, profile.department)}
+                    </span>
+                  </div>
+                  <div className="truncate text-xs text-slate-500">
+                    {profile.phone || profile.id}
+                  </div>
                 </div>
               </div>
 
-              {profile.role !== "owner" && (
-                <>
-                  <select
-                    value={profile.role}
-                    disabled={busy}
-                    onChange={(e) => onRole(profile.id, e.target.value as Role)}
-                    aria-label={`Role for ${profile.name ?? "user"}`}
-                    className="h-9 rounded-lg border bg-white px-2 text-xs outline-none focus:ring-2 focus:ring-slate-900"
-                  >
-                    <option value="staff">Staff</option>
-                    <option value="admin">Admin</option>
-                  </select>
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+                {profile.role !== "owner" && (
+                  <>
+                    <select
+                      value={profile.role}
+                      disabled={busy}
+                      onChange={(e) => onRole(profile.id, e.target.value as Role)}
+                      aria-label={`Role for ${profile.name ?? "user"}`}
+                      className="h-9 rounded-lg border bg-white px-2 text-xs outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      <option value="staff">Staff</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(profile)}
+                      className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium hover:bg-slate-50"
+                    >
+                      <Settings2 className="size-3.5" /> Department &amp; pay
+                    </button>
+                  </>
+                )}
+
+                {profile.approved ? (
                   <button
                     type="button"
-                    onClick={() => setEditing(profile)}
-                    className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium hover:bg-slate-50"
+                    disabled={busy || profile.role === "owner"}
+                    onClick={() => onRevoke(profile.id)}
+                    className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40"
                   >
-                    <Settings2 className="size-3.5" /> Department &amp; pay
+                    <X className="size-3.5" /> Revoke
                   </button>
-                </>
-              )}
-
-              {profile.approved ? (
-                <button
-                  type="button"
-                  disabled={busy || profile.role === "owner"}
-                  onClick={() => onRevoke(profile.id)}
-                  className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40"
-                >
-                  <X className="size-3.5" /> Revoke
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onApprove(profile.id)}
-                  className="flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"
-                >
-                  <Check className="size-3.5" /> Approve
-                </button>
-              )}
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onApprove(profile.id)}
+                    className="flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"
+                  >
+                    <Check className="size-3.5" /> Approve
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -491,252 +494,6 @@ function NumberField({
         className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-slate-900"
       />
     </label>
-  );
-}
-
-function slugify(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-/** Admin editor for the salon's payment methods (cash / transfer by default). */
-function PaymentMethodsCard() {
-  const methods = usePaymentMethods();
-  const update = useUpdatePaymentMethods();
-  const [draft, setDraft] = useState<PaymentMethodOption[]>(methods);
-  const [dirty, setDirty] = useState(false);
-
-  useEffect(() => {
-    if (!dirty) setDraft(methods);
-  }, [methods, dirty]);
-
-  function edit(index: number, label: string) {
-    setDirty(true);
-    setDraft((prev) =>
-      prev.map((method, i) => (i === index ? { ...method, label } : method)),
-    );
-  }
-
-  function add() {
-    setDirty(true);
-    setDraft((prev) => [...prev, { id: "", label: "" }]);
-  }
-
-  function remove(index: number) {
-    setDirty(true);
-    setDraft((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function save() {
-    const cleaned: PaymentMethodOption[] = [];
-    for (const method of draft) {
-      const label = method.label.trim();
-      if (!label) continue;
-      const id = (method.id || slugify(label)).trim();
-      if (!id || cleaned.some((entry) => entry.id === id)) continue;
-      cleaned.push({ id, label });
-    }
-    if (cleaned.length === 0) {
-      addToast({ title: "Add at least one method", color: "warning" });
-      return;
-    }
-    update.mutate(cleaned, {
-      onSuccess: () => {
-        setDirty(false);
-        addToast({ title: "Payment methods saved", color: "success" });
-      },
-      onError: (err) =>
-        addToast({
-          title: err instanceof Error ? err.message : "Save failed",
-          color: "danger",
-        }),
-    });
-  }
-
-  return (
-    <div className="overflow-hidden rounded-xl border bg-white shadow-card">
-      <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          Payment methods
-        </span>
-        <button
-          type="button"
-          onClick={add}
-          className="text-xs font-medium hover:underline"
-        >
-          + Add method
-        </button>
-      </div>
-
-      <div className="divide-y">
-        {draft.map((method, index) => (
-          <div key={index} className="flex items-center gap-2 p-3">
-            <input
-              value={method.label}
-              onChange={(e) => edit(index, e.target.value)}
-              placeholder="Method name"
-              className="h-9 flex-1 rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-slate-900"
-            />
-            <span className="w-24 truncate text-xs text-slate-400">
-              {method.id || slugify(method.label) || "—"}
-            </span>
-            <button
-              type="button"
-              onClick={() => remove(index)}
-              aria-label="Remove method"
-              className="grid size-8 shrink-0 place-items-center rounded-md border text-red-500 hover:bg-red-50"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-        ))}
-        {draft.length === 0 && (
-          <p className="p-6 text-center text-sm text-slate-500">
-            No payment methods yet.
-          </p>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between gap-2 border-t p-3">
-        <p className="text-xs text-slate-500">
-          Shown when taking payment. Renaming keeps existing sales intact.
-        </p>
-        <button
-          type="button"
-          onClick={save}
-          disabled={!dirty || update.isPending}
-          className="shrink-0 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-        >
-          Save
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Admin editor for the staff departments shown when assigning people. */
-function DepartmentsCard() {
-  const departments = useDepartments();
-  const update = useUpdateDepartments();
-  const [draft, setDraft] = useState<Department[]>(departments);
-  const [dirty, setDirty] = useState(false);
-
-  useEffect(() => {
-    if (!dirty) setDraft(departments);
-  }, [departments, dirty]);
-
-  function edit(index: number, patch: Partial<Department>) {
-    setDirty(true);
-    setDraft((prev) =>
-      prev.map((dept, i) => (i === index ? { ...dept, ...patch } : dept)),
-    );
-  }
-
-  function add() {
-    setDirty(true);
-    setDraft((prev) => [...prev, { id: "", label: "", salonTools: false }]);
-  }
-
-  function remove(index: number) {
-    setDirty(true);
-    setDraft((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function save() {
-    const cleaned: Department[] = [];
-    for (const dept of draft) {
-      const label = dept.label.trim();
-      if (!label) continue;
-      const id = (dept.id || slugify(label)).trim();
-      if (!id || cleaned.some((entry) => entry.id === id)) continue;
-      cleaned.push({ id, label, salonTools: dept.salonTools });
-    }
-    if (cleaned.length === 0) {
-      addToast({ title: "Add at least one department", color: "warning" });
-      return;
-    }
-    update.mutate(cleaned, {
-      onSuccess: () => {
-        setDirty(false);
-        addToast({ title: "Departments saved", color: "success" });
-      },
-      onError: (err) =>
-        addToast({
-          title: err instanceof Error ? err.message : "Save failed",
-          color: "danger",
-        }),
-    });
-  }
-
-  return (
-    <div className="overflow-hidden rounded-xl border bg-white shadow-card">
-      <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          Departments
-        </span>
-        <button
-          type="button"
-          onClick={add}
-          className="text-xs font-medium hover:underline"
-        >
-          + Add department
-        </button>
-      </div>
-
-      <div className="divide-y">
-        {draft.map((dept, index) => (
-          <div key={index} className="flex flex-wrap items-center gap-2 p-3">
-            <input
-              value={dept.label}
-              onChange={(e) => edit(index, { label: e.target.value })}
-              placeholder="Department name"
-              className="h-9 min-w-[10rem] flex-1 rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-slate-900"
-            />
-            <span className="w-24 truncate text-xs text-slate-400">
-              {dept.id || slugify(dept.label) || "—"}
-            </span>
-            <label className="flex items-center gap-1.5 text-xs text-slate-600">
-              <input
-                type="checkbox"
-                checked={dept.salonTools}
-                onChange={(e) => edit(index, { salonTools: e.target.checked })}
-              />
-              Salon tools
-            </label>
-            <button
-              type="button"
-              onClick={() => remove(index)}
-              aria-label="Remove department"
-              className="grid size-8 shrink-0 place-items-center rounded-md border text-red-500 hover:bg-red-50"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-        ))}
-        {draft.length === 0 && (
-          <p className="p-6 text-center text-sm text-slate-500">
-            No departments yet.
-          </p>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between gap-2 border-t p-3">
-        <p className="text-xs text-slate-500">
-          Tick “Salon tools” for departments that should see sales and services.
-        </p>
-        <button
-          type="button"
-          onClick={save}
-          disabled={!dirty || update.isPending}
-          className="shrink-0 rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-        >
-          Save
-        </button>
-      </div>
-    </div>
   );
 }
 

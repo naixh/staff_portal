@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Clock3, ShieldCheck, Wallet } from "lucide-react";
+import { ShieldCheck, Wallet } from "lucide-react";
+import { ClockCard } from "@/components/clock-card";
 import { Money } from "@/components/money";
 import { useAuth } from "@/hooks/use-auth";
-import { todayKey, useAttendance, useClock } from "@/hooks/use-attendance";
 import { usePayrollPayments } from "@/hooks/use-payroll";
 import { useProfiles } from "@/hooks/use-profiles";
 import { getSupabase } from "@/supabase";
-import { formatDuration, initial, minutesBetween } from "@/utils/format";
 
 function greeting(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -23,20 +22,9 @@ function greeting(hour: number): string {
  */
 export function StaffHome() {
   const { session } = useAuth();
-  const { data: attendance = [] } = useAttendance();
   const { data: profiles = [] } = useProfiles();
   const { data: payments = [] } = usePayrollPayments();
-  const clock = useClock();
   const [showPermit, setShowPermit] = useState(false);
-
-  const today = todayKey();
-  const mine = attendance.find(
-    (record) => record.date === today && record.barberId === session?.barberId,
-  );
-  const checkedIn = Boolean(mine?.clockIn) && !mine?.clockOut;
-  const finished = Boolean(mine?.clockOut);
-  const onBreak = checkedIn && Boolean(mine?.breakStart) && !mine?.breakEnd;
-  const away = mine?.status;
 
   const me = profiles.find((profile) => profile.id === session?.userId);
   const outstanding = payments.filter((payment) => payment.status !== "signed");
@@ -58,26 +46,6 @@ export function StaffHome() {
   });
   const permit = permitQuery.data?.work_permit ?? null;
 
-  const statusText =
-    away === "leave"
-      ? "On leave today"
-      : away === "sick"
-        ? "Marked sick today"
-        : onBreak
-          ? `On break since ${mine?.breakStart}`
-          : finished
-            ? `Completed · ${mine?.clockIn ?? "—"}–${mine?.clockOut}`
-            : checkedIn
-              ? `Checked in at ${mine?.clockIn}`
-              : "Not checked in";
-  const primaryLabel = finished ? "Clock In Again" : checkedIn ? "Clock Out" : "Clock In";
-  const worked = minutesBetween(mine?.clockIn, mine?.clockOut);
-
-  function act(action: "in" | "out" | "break-start" | "break-end") {
-    if (!session) return;
-    clock.mutate({ barberId: session.barberId, barberName: session.name, action });
-  }
-
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border bg-gradient-to-br from-white to-teal-50 p-5 shadow-card">
@@ -91,47 +59,7 @@ export function StaffHome() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border bg-white p-5 shadow-card">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-full bg-slate-950 text-sm font-semibold text-white">
-              {initial(session?.name ?? "?")}
-            </div>
-            <div>
-              <div className="font-semibold">Today&apos;s attendance</div>
-              <div className="text-xs text-slate-500">{statusText}</div>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-            <span>Break: {mine?.breakStart ?? "—"}</span>
-            <span>Worked: {formatDuration(worked)}</span>
-          </div>
-          <div className="mt-4 space-y-2">
-            <button
-              type="button"
-              onClick={() => act(checkedIn ? "out" : "in")}
-              disabled={!session || clock.isPending}
-              className="w-full rounded-lg bg-slate-950 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
-            >
-              {primaryLabel}
-            </button>
-            {checkedIn && (
-              <button
-                type="button"
-                onClick={() => act(onBreak ? "break-end" : "break-start")}
-                disabled={clock.isPending}
-                className="w-full rounded-lg border px-4 py-3 text-sm font-medium hover:bg-slate-50 disabled:opacity-40"
-              >
-                {onBreak ? "End Break" : "Start Break"}
-              </button>
-            )}
-            <Link
-              to="/attendance"
-              className="flex items-center justify-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-800"
-            >
-              <Clock3 className="size-3.5" /> History & team attendance
-            </Link>
-          </div>
-        </div>
+        <ClockCard showHistory />
 
         <div className="rounded-xl border bg-white p-5 shadow-card">
           <div className="flex items-center justify-between">

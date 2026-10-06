@@ -1,6 +1,10 @@
 import { RefreshCw, RotateCw, X } from "lucide-react";
 import { resetLocalData } from "@/db/dexie";
-import { useAuth } from "@/hooks/use-auth";
+import {
+  DepartmentsCard,
+  PaymentMethodsCard,
+} from "@/components/salon-settings";
+import { canManageTeam, useAuth } from "@/hooks/use-auth";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { syncEngine } from "@/sync/engine";
 
@@ -13,6 +17,7 @@ export function SyncSettings({
 }) {
   const status = useSyncStatus();
   const { session } = useAuth();
+  const admin = canManageTeam(session?.role);
 
   if (!open) return null;
 
@@ -25,9 +30,10 @@ export function SyncSettings({
       <div className="w-full max-w-lg rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
         <div className="flex items-center justify-between border-b p-4">
           <div>
-            <h3 className="font-semibold">Offline &amp; sync</h3>
+            <h3 className="font-semibold">Settings</h3>
             <p className="text-xs text-slate-500">
-              Changes are stored on this device first, then synced to Supabase.
+              Salon options and syncing. Changes are stored on this device first,
+              then synced to Supabase.
             </p>
           </div>
           <button
@@ -40,7 +46,10 @@ export function SyncSettings({
           </button>
         </div>
 
-        <div className="space-y-4 p-4">
+        <div className="max-h-[80vh] space-y-4 overflow-y-auto p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Offline &amp; sync
+          </div>
           <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 text-sm">
             <StatusRow
               label="Backend"
@@ -73,6 +82,16 @@ export function SyncSettings({
             <code>VITE_SUPABASE_ANON_KEY</code>. Without them the app runs
             local-only.
           </p>
+
+          {admin && (
+            <div className="space-y-4 border-t pt-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Salon
+              </div>
+              <PaymentMethodsCard />
+              <DepartmentsCard />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t p-4">

@@ -2,8 +2,12 @@ import { Link } from "@tanstack/react-router";
 import { UserPlus } from "lucide-react";
 import type { ClockAction } from "@/api/local";
 import { canManageTeam, useAuth, ROLE_LABELS } from "@/hooks/use-auth";
-import { canUseSalonTools, useDepartments } from "@/hooks/use-departments";
-import { useBarbers } from "@/hooks/use-barbers";
+import {
+  canUseSalonTools,
+  departmentLabel,
+  useDepartments,
+} from "@/hooks/use-departments";
+import { useStaffRoster } from "@/hooks/use-staff-roster";
 import { todayKey, useAttendance, useClock, useSetLeaveStatus } from "@/hooks/use-attendance";
 import type { Attendance, LeaveStatus } from "@/models/types";
 import { formatDuration, initial, minutesBetween } from "@/utils/format";
@@ -28,7 +32,7 @@ function breakLabel(record: Attendance | undefined): string {
 export function AttendanceRoute() {
   const { session } = useAuth();
   const departments = useDepartments();
-  const { data: barbers = [] } = useBarbers();
+  const { members: roster } = useStaffRoster();
   const { data: attendance = [] } = useAttendance();
   const clock = useClock();
   const setLeave = useSetLeaveStatus();
@@ -48,7 +52,8 @@ export function AttendanceRoute() {
   const onBreak = checkedIn && Boolean(myRecord?.breakStart) && !myRecord?.breakEnd;
 
   const myAllowance = session
-    ? barbers.find((barber) => barber.id === session.barberId)?.breakMinutes
+    ? (roster.find((member) => member.id === session.barberId)?.breakMinutes ??
+      undefined)
     : undefined;
   const myBreak = breakTaken(myRecord);
 
@@ -61,10 +66,15 @@ export function AttendanceRoute() {
     });
   }
 
-  const rows = barbers.map((barber) => ({
-    id: barber.id,
-    name: barber.name,
-    role: barber.id === session?.barberId ? "You" : "Staff",
+  const rows = roster.map((member) => ({
+    id: member.id,
+    name: member.name,
+    role:
+      member.id === session?.barberId
+        ? "You"
+        : member.department
+          ? departmentLabel(departments, member.department)
+          : "Staff",
   }));
   if (session && !rows.some((row) => row.id === session.barberId)) {
     rows.unshift({ id: session.barberId, name: session.name, role: "You" });
