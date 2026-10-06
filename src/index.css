@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Respect iOS safe areas when installed as PWA. */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── SalonOS design helpers ─────────────────────────────────────────── */
+.shadow-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(15, 23, 42, 0.06);
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-active {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.tab-active {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.status-in {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-out {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-break {
+  background: #fef3c7;
+  color: #92400e;
+}

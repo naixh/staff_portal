@@ -1,0 +1,18 @@
+name = "salonos-sync"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# ── NoSQL storage (Workers KV) ─────────────────────────────────────────────
+# Create the namespace, then paste its id below:
+#   npx wrangler kv namespace create SALON_DB
+[[kv_namespaces]]
+binding = "SALON_DB"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# ── Optional configuration ─────────────────────────────────────────────────
+# When SYNC_TOKEN is set, the Worker requires `Authorization: Bearer <token>`
+# on every request. Use the same token in the PWA's "Offline & sync" dialog.
+#
+# [vars]
+# SYNC_TOKEN = "change-me"
+# ALLOWED_ORIGIN = "https://your-app.pages.dev"

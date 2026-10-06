@@ -1,0 +1,11 @@
+# Copy this file to `.dev.vars` (gitignored) to set local development values.
+# These mirror the Worker `vars`/secrets used by `wrangler dev`.
+#
+# NOTE: this file is for Worker *runtime* variables, not Wrangler auth.
+# Wrangler auth uses `wrangler login` or the CLOUDFLARE_API_TOKEN env var.
+
+# When set, the Worker requires `Authorization: Bearer <SYNC_TOKEN>`.
+SYNC_TOKEN="change-me"
+
+# CORS origin allowed to call the Worker (your PWA origin, or "*").
+ALLOWED_ORIGIN="http://localhost:3000"
