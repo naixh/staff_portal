@@ -228,7 +228,7 @@ function SalonDashboard() {
                     <Scissors className="size-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">
+                    <div className="break-words text-sm font-medium">
                       {saleLabel(sale)}
                     </div>
                     <div className="text-xs text-slate-500">
